@@ -1,6 +1,9 @@
 #include <iostream>
-#include <unistd.h>/*
+#include <exception>
+#include <unistd.h>
+#include <sys/types.h>/*
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>*/
 #include "winsock.h"
@@ -26,6 +29,15 @@ struct option opts[] = {
         {0,0 ,0,0},
 };
 
+void daemonize() {
+    chdir("/");
+
+    setsid();
+
+    fclose(stderr);
+    fclose(stdout);
+    fclose(stdin);
+}
 
 int main(int argc, char* argv[]) {
     char opchar = 0;
@@ -34,7 +46,6 @@ int main(int argc, char* argv[]) {
     string dir (current_dir);
 
     while (-1 != (opchar = getopt(argc,argv, "h:p:d:", opts, &opindex))) {
-
         switch (opchar) {
             case 'h':
                 host_addr.sin_addr = inet_addr(optarg);
@@ -47,6 +58,43 @@ int main(int argc, char* argv[]) {
                 break;
             default:
                 break;
+        }
+    }
+
+    int listen_socket;
+    if ((listen_socket = socket(AF_INET,SOCK_STREAM,0)) == -1) {
+        throw runtime_error("socket_init_err");
+        return -1;
+    }
+
+    if (bind(listen_socket, (struct sockaddr*) &host_addr,
+            sizeof(host_addr)) == -1) {
+        throw runtime_error("bind_err");
+        return -1;
+    }
+
+    if (set_nonblock(listen_socket) == -1) {
+        throw runtime_error("unblock_err");
+        return -1;
+    }
+
+    if (listen(listen_socket, SOMAXCONN) == -1) {
+        throw runtime_error("listen_activation_err");
+        return -1;
+    }
+
+    daemonize();
+
+    while (true) {
+        int new_slave_socket;
+        if ((new_slave_socket = accept(listen_socket,NULL,NULL)) == -1) {
+            cerr << "Error when accepting new connection." << endl;
+            continue;
+        }
+        if (fork() =! 0) close(new_slave_socket);
+        else {
+            close(listen_socket);
+            //TODO io
         }
     }
 
