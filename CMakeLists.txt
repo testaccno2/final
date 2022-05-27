@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 3.22)
 project(stepik_mt_final)
 
 set(CMAKE_CXX_STANDARD 11)
