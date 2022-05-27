@@ -1,0 +1,4 @@
+ToolSet: w64 9.0 (local)@C:\Users\eco-g\Desktop\chill\CLion-2022.1.win\bin\mingw
+Options: 
+
+Options:-DCMAKE_MAKE_PROGRAM=C:/Users/eco-g/Desktop/chill/CLion-2022.1.win/bin/ninja/win/ninja.exe
