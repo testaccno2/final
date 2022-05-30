@@ -1,7 +1,9 @@
 #include <iostream>
+#include <fstream>
 #include <exception>
 #include <unistd.h>
-#include <sys/types.h>/*
+#include <sys/types.h>
+#include <cstddef>/*
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
@@ -94,7 +96,14 @@ int main(int argc, char* argv[]) {
         if (fork() =! 0) close(new_slave_socket);
         else {
             close(listen_socket);
-            //TODO io
+            //TODO io recv
+
+            fstream file("TODO", ios::in | ios::binary);
+            if(!file.is_open())
+                cerr << "TODO" << " — 404" << endl;
+            std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            if (send(new_slave_socket, contents.c_str(), contents.length(), 0 ) == -1)
+                cerr << "send err" << endl;
         }
     }
 
