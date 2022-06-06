@@ -1,3 +1,3 @@
-C:/Users/eco-g/Desktop/отдыхать/stepik_mt_final/cmake-build-debug/CMakeFiles/stepik_mt_final.dir
-C:/Users/eco-g/Desktop/отдыхать/stepik_mt_final/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/eco-g/Desktop/отдыхать/stepik_mt_final/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/tmp/tmp.FVBaPQ16DE/cmake-build-debug/CMakeFiles/stepik_mt_final.dir
+/tmp/tmp.FVBaPQ16DE/cmake-build-debug/CMakeFiles/edit_cache.dir
+/tmp/tmp.FVBaPQ16DE/cmake-build-debug/CMakeFiles/rebuild_cache.dir

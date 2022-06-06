@@ -1,38 +1,25 @@
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <exception>
 #include <unistd.h>
 #include <sys/types.h>
-#include <cstddef>/*
+#include <cstddef>
+#include <getopt.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>*/
-#include "winsock.h"
+#include <arpa/inet.h>
+
+#define RECVBUFF_SIZE 2048
 
 using namespace std;
 
-char[PATH_MAX] current_dir;
-getwd(&current_dir);
+const string HEADER200 = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n"; //HTML
+const string HEADER404 = "HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\n\r\n";
 
-struct sockaddr_in host_addr;
-host_addr.sin_addr = inet_addr();
-host_addr.sin_port = htons("8080");
-host_addr.sin_family = AF_INET;
-
-struct option opts[] = {
-
-        {"ip",1 ,0,'h'},
-
-        {"port",1 ,0,'p'},
-
-        {"directory",1 ,0,'d'},
-
-        {0,0 ,0,0},
-};
-
-void daemonize() {
-    chdir("/");
+void daemonize(const string& dir) {
+    chdir(dir.c_str());
 
     setsid();
 
@@ -41,16 +28,72 @@ void daemonize() {
     fclose(stdin);
 }
 
-int main(int argc, char* argv[]) {
-    char opchar = 0;
-    int opindex = 0;
+struct Request_Line {
+    string Method;
+    string Request_URI;
+    string HTTP_Version;
+};
 
+Request_Line get_req(int listen_socket) {
+    if (listen_socket == -1) throw runtime_error("get req err: invalid socket");
+
+    char buf[RECVBUFF_SIZE];
+    if (recv(listen_socket,&buf,RECVBUFF_SIZE,0) == -1)
+        throw runtime_error("get req err: recv cmd");
+
+    string buf_str(buf);
+    istringstream received_data(buf_str);
+    struct Request_Line req;
+    received_data >> req.Method >> req.Request_URI >> req.HTTP_Version;
+
+    return req;
+}
+
+void HTTP10_GET(string dir, string Request_URI, int socket) {
+    if (socket == -1) throw runtime_error("get send err: invalid socket");
+
+    if ( (!dir.empty()) && dir.back() == '/') dir.pop_back();
+
+    fstream file(dir + Request_URI, ios::in | ios::binary);
+    if(file.is_open()) {
+        std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        contents += "\r\n\r\n";
+        string full_HEADER200 = HEADER200 + "Content-Length: " + to_string(contents.length()) + "\r\n\r\n";
+
+        if (send(socket, full_HEADER200.c_str(), full_HEADER200.length(), 0 ) == -1)
+            cerr << "send 200 err" << endl;
+        if (send(socket, contents.c_str(), contents.length(), 0 ) == -1)
+            cerr << "send body err" << endl;
+
+        file.close();
+    }
+    else {
+        if (send(socket, HEADER404.c_str(), HEADER404.length(), 0 ) == -1)
+            cerr << "send 404 err" << endl;
+    }
+
+    close(socket);
+
+
+}
+
+int main(int argc, char* argv[]) {
+
+    struct sockaddr_in host_addr;
+    host_addr.sin_addr.s_addr = INADDR_ANY;
+    host_addr.sin_port = htons(8080);
+    host_addr.sin_family = AF_INET;
+
+    char opchar = 0;
+
+    char current_dir[RECVBUFF_SIZE];
+    getwd(current_dir);
     string dir (current_dir);
 
-    while (-1 != (opchar = getopt(argc,argv, "h:p:d:", opts, &opindex))) {
+    while (-1 != (opchar = getopt(argc,argv, "h:p:d:"))) {
         switch (opchar) {
             case 'h':
-                host_addr.sin_addr = inet_addr(optarg);
+                host_addr.sin_addr.s_addr = inet_addr(optarg);
                 break;
             case 'p':
                 host_addr.sin_port = htons(atoi(optarg));
@@ -75,36 +118,32 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    if (set_nonblock(listen_socket) == -1) {
-        throw runtime_error("unblock_err");
-        return -1;
-    }
+//    if (set_nonblock(listen_socket) == -1) {
+//        throw runtime_error("unblock_err");
+//        return -1;
+//    }
 
     if (listen(listen_socket, SOMAXCONN) == -1) {
         throw runtime_error("listen_activation_err");
         return -1;
     }
 
-    daemonize();
+  //  daemonize(dir);
 
     while (true) {
         int new_slave_socket;
         if ((new_slave_socket = accept(listen_socket,NULL,NULL)) == -1) {
-            cerr << "Error when accepting new connection." << endl;
+            perror("Error when accepting new connection");
             continue;
         }
-        if (fork() =! 0) close(new_slave_socket);
-        else {
+        if (fork() == 0)  {
             close(listen_socket);
-            //TODO io recv
+            Request_Line new_request = get_req(new_slave_socket);
 
-            fstream file("TODO", ios::in | ios::binary);
-            if(!file.is_open())
-                cerr << "TODO" << " — 404" << endl;
-            std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            if (send(new_slave_socket, contents.c_str(), contents.length(), 0 ) == -1)
-                cerr << "send err" << endl;
+            HTTP10_GET(dir,new_request.Request_URI,new_slave_socket);
+
         }
+        else close(new_slave_socket);
     }
 
 }
